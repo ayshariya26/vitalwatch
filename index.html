@@ -1,0 +1,658 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VitalWatch — AI Health Monitoring Demo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,wght@0,400;0,500;0,600;1,400&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#F5F7F6;
+    --panel:#FFFFFF;
+    --ink:#1F2A24;
+    --muted:#5E6B64;
+    --line:#DDE5E1;
+    --primary:#2F6F5E;
+    --primary-dark:#1F4B3F;
+    --normal-bg:#DCEFE7;
+    --normal-fg:#1F6B4E;
+    --alert-bg:#F5DEDA;
+    --alert-fg:#A6392D;
+    --alert-line:#B23A2E;
+    --font-serif:"Newsreader", Georgia, "Times New Roman", serif;
+    --font-sans:"IBM Plex Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    --font-mono:"IBM Plex Mono", "SFMono-Regular", Consolas, monospace;
+  }
+  :root:not([data-theme="light"]){
+    @media (prefers-color-scheme: dark){
+      --bg:#151A18;
+      --panel:#1C2320;
+      --ink:#EAF0EC;
+      --muted:#9AABA2;
+      --line:#2C3733;
+      --primary:#5BAF97;
+      --primary-dark:#3E8570;
+      --normal-bg:#1E3229;
+      --normal-fg:#7FD3AC;
+      --alert-bg:#3A211D;
+      --alert-fg:#F0A99E;
+      --alert-line:#D9695C;
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#151A18;
+    --panel:#1C2320;
+    --ink:#EAF0EC;
+    --muted:#9AABA2;
+    --line:#2C3733;
+    --primary:#5BAF97;
+    --primary-dark:#3E8570;
+    --normal-bg:#1E3229;
+    --normal-fg:#7FD3AC;
+    --alert-bg:#3A211D;
+    --alert-fg:#F0A99E;
+    --alert-line:#D9695C;
+  }
+
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--bg);
+    color:var(--ink);
+    font-family:var(--font-sans);
+    line-height:1.5;
+    -webkit-font-smoothing:antialiased;
+  }
+  a{color:var(--primary-dark);}
+  :focus-visible{outline:2px solid var(--primary); outline-offset:2px;}
+
+  .wrap{max-width:1080px; margin:0 auto; padding:0 24px;}
+
+  header.top{
+    padding:40px 24px 28px;
+    border-bottom:1px solid var(--line);
+  }
+  .top-inner{max-width:1080px; margin:0 auto; display:flex; justify-content:space-between; align-items:flex-end; gap:24px; flex-wrap:wrap;}
+  .brand{font-family:var(--font-serif); font-size:28px; font-weight:600; letter-spacing:-0.01em;}
+  .brand span{color:var(--primary);}
+  .tagline{color:var(--muted); font-size:15px; max-width:46ch; margin-top:6px;}
+  .status-pill{
+    display:inline-flex; align-items:center; gap:8px;
+    padding:8px 14px; border-radius:100px;
+    background:var(--normal-bg); color:var(--normal-fg);
+    font-size:14px; font-weight:500;
+    transition:background .25s ease, color .25s ease;
+  }
+  .status-pill.alert{background:var(--alert-bg); color:var(--alert-fg);}
+  .dot{width:8px; height:8px; border-radius:50%; background:currentColor;}
+  .dot.pulse{animation:pulse 1.4s ease-in-out infinite;}
+  @media (prefers-reduced-motion: reduce){ .dot.pulse{animation:none;} }
+  @keyframes pulse{
+    0%,100%{opacity:1; transform:scale(1);}
+    50%{opacity:.4; transform:scale(.7);}
+  }
+
+  main{padding:40px 24px 20px;}
+
+  section{margin-bottom:56px;}
+  h2{
+    font-family:var(--font-serif);
+    font-size:22px; font-weight:600;
+    margin:0 0 4px;
+  }
+  .section-note{color:var(--muted); font-size:14px; margin:0 0 20px; max-width:60ch;}
+
+  .vitals-grid{display:grid; grid-template-columns:repeat(3,1fr); gap:18px;}
+  @media (max-width:720px){ .vitals-grid{grid-template-columns:1fr;} }
+
+  .vital-card{
+    background:var(--panel);
+    border:1px solid var(--line);
+    border-radius:10px;
+    padding:20px 22px;
+    position:relative;
+    overflow:hidden;
+  }
+  .vital-card.abnormal{border-color:var(--alert-line);}
+  .vital-label{font-size:13px; color:var(--muted); display:flex; justify-content:space-between; align-items:center;}
+  .vital-value{
+    font-family:var(--font-mono);
+    font-size:40px;
+    font-weight:500;
+    margin:10px 0 2px;
+    display:flex; align-items:baseline; gap:6px;
+  }
+  .vital-value .unit{font-size:15px; color:var(--muted); font-weight:400;}
+  .vital-range{font-size:12.5px; color:var(--muted);}
+  .sparkline{width:100%; height:44px; margin-top:12px; display:block;}
+  .flag{
+    font-size:12px; font-weight:600; color:var(--alert-fg);
+    background:var(--alert-bg); padding:2px 8px; border-radius:100px;
+  }
+
+  .alert-banner{
+    display:flex; align-items:flex-start; gap:14px;
+    padding:18px 20px;
+    border-radius:10px;
+    background:var(--normal-bg);
+    color:var(--normal-fg);
+    transition:background .25s ease, color .25s ease;
+  }
+  .alert-banner.is-alert{background:var(--alert-bg); color:var(--alert-fg);}
+  .alert-banner strong{display:block; font-size:15px; margin-bottom:2px;}
+  .alert-banner p{margin:0; font-size:14px; opacity:.9;}
+
+  .controls{margin-top:16px; display:flex; gap:10px; flex-wrap:wrap;}
+  button{
+    font-family:var(--font-sans);
+    font-size:14px; font-weight:500;
+    padding:10px 16px;
+    border-radius:8px;
+    border:1px solid var(--line);
+    background:var(--panel);
+    color:var(--ink);
+    cursor:pointer;
+  }
+  button:hover{border-color:var(--primary);}
+  button.primary{background:var(--primary); color:#fff; border-color:var(--primary);}
+  button.primary:hover{background:var(--primary-dark); border-color:var(--primary-dark);}
+
+  .chart-panel{
+    background:var(--panel); border:1px solid var(--line); border-radius:10px;
+    padding:22px;
+  }
+  .chart-header{display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; flex-wrap:wrap; gap:10px;}
+  .metric-toggle{display:flex; gap:6px;}
+  .metric-toggle button{padding:6px 12px; font-size:13px;}
+  .metric-toggle button.active{background:var(--primary); color:#fff; border-color:var(--primary);}
+  #history-chart{width:100%; height:220px; display:block;}
+
+  .pipeline{
+    display:flex; align-items:stretch; gap:0; flex-wrap:wrap;
+  }
+  .pipe-step{
+    flex:1; min-width:150px;
+    background:var(--panel); border:1px solid var(--line);
+    padding:18px 16px; text-align:center;
+    position:relative;
+  }
+  .pipe-step:first-child{border-top-left-radius:10px; border-bottom-left-radius:10px;}
+  .pipe-step:last-child{border-top-right-radius:10px; border-bottom-right-radius:10px;}
+  .pipe-step + .pipe-step{border-left:none;}
+  .pipe-icon{font-size:22px; margin-bottom:8px;}
+  .pipe-title{font-weight:600; font-size:14px; margin-bottom:4px;}
+  .pipe-desc{font-size:12.5px; color:var(--muted); line-height:1.4;}
+  .pipe-arrow{
+    display:flex; align-items:center; justify-content:center;
+    color:var(--muted); font-size:16px; width:28px;
+  }
+  @media (max-width:720px){
+    .pipeline{flex-direction:column;}
+    .pipe-step{border-left:1px solid var(--line) !important; border-radius:0 !important;}
+    .pipe-step:first-child{border-top-left-radius:10px !important; border-top-right-radius:10px !important;}
+    .pipe-step:last-child{border-bottom-left-radius:10px !important; border-bottom-right-radius:10px !important;}
+    .pipe-arrow{transform:rotate(90deg); width:auto; height:20px;}
+  }
+
+  footer{
+    border-top:1px solid var(--line);
+    padding:28px 24px 40px;
+    color:var(--muted);
+    font-size:13px;
+  }
+  footer .wrap{display:flex; justify-content:space-between; flex-wrap:wrap; gap:8px;}
+
+  .med-panel{
+    background:var(--panel); border:1px solid var(--line); border-radius:10px;
+    padding:22px;
+  }
+  .med-form{
+    display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end;
+    padding-bottom:18px; margin-bottom:18px;
+    border-bottom:1px solid var(--line);
+  }
+  .med-field{display:flex; flex-direction:column; gap:6px;}
+  .med-field label{font-size:12.5px; color:var(--muted);}
+  .med-field input{
+    font-family:var(--font-sans); font-size:14px;
+    padding:9px 12px; border-radius:8px; border:1px solid var(--line);
+    background:var(--bg); color:var(--ink);
+    min-width:160px;
+  }
+  .med-field input:focus-visible{outline:2px solid var(--primary); outline-offset:1px;}
+
+  .med-list{list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:10px;}
+  .med-empty{color:var(--muted); font-size:14px; padding:10px 0;}
+  .med-item{
+    display:flex; align-items:center; justify-content:space-between; gap:14px;
+    padding:14px 16px; border-radius:8px; border:1px solid var(--line);
+    flex-wrap:wrap;
+  }
+  .med-item.due{border-color:var(--alert-line); background:var(--alert-bg);}
+  .med-item.taken{opacity:.6;}
+  .med-info{display:flex; align-items:center; gap:12px;}
+  .med-time{
+    font-family:var(--font-mono); font-size:15px; font-weight:500;
+    background:var(--bg); border:1px solid var(--line); border-radius:6px;
+    padding:4px 8px; min-width:56px; text-align:center;
+  }
+  .med-name{font-size:14.5px; font-weight:500;}
+  .med-status{font-size:12.5px; color:var(--muted);}
+  .med-item.due .med-status{color:var(--alert-fg); font-weight:600;}
+  .med-actions{display:flex; gap:8px;}
+  .med-actions button{padding:7px 12px; font-size:13px;}
+  .med-actions .taken-btn{background:var(--primary); color:#fff; border-color:var(--primary);}
+  .med-actions .remove-btn{color:var(--muted);}
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="top-inner">
+    <div>
+      <div class="brand">Vital<span>Watch</span></div>
+      <div class="tagline">A simulated live demo of an AI-powered health monitoring concept — heart rate, oxygen, and temperature tracked continuously, with AI flagging anything abnormal.</div>
+    </div>
+    <div class="status-pill normal-bg" id="status-pill">
+      <span class="dot pulse" id="status-dot"></span>
+      <span id="status-text">All readings normal</span>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <section>
+    <h2>Live readings</h2>
+    <p class="section-note">Simulated sensor data, updating every two seconds — standing in for a wearable heart-rate, SpO₂, and temperature sensor feed.</p>
+    <div class="vitals-grid">
+
+      <div class="vital-card" id="card-hr">
+        <div class="vital-label">Heart rate <span class="flag" id="flag-hr" style="display:none;">Abnormal</span></div>
+        <div class="vital-value"><span id="val-hr">--</span><span class="unit">bpm</span></div>
+        <div class="vital-range">Normal range: 50–110 bpm</div>
+        <svg class="sparkline" id="spark-hr" viewBox="0 0 300 44" preserveAspectRatio="none"></svg>
+      </div>
+
+      <div class="vital-card" id="card-spo2">
+        <div class="vital-label">Oxygen saturation <span class="flag" id="flag-spo2" style="display:none;">Abnormal</span></div>
+        <div class="vital-value"><span id="val-spo2">--</span><span class="unit">% SpO₂</span></div>
+        <div class="vital-range">Normal range: 94–100%</div>
+        <svg class="sparkline" id="spark-spo2" viewBox="0 0 300 44" preserveAspectRatio="none"></svg>
+      </div>
+
+      <div class="vital-card" id="card-temp">
+        <div class="vital-label">Body temperature <span class="flag" id="flag-temp" style="display:none;">Abnormal</span></div>
+        <div class="vital-value"><span id="val-temp">--</span><span class="unit">°C</span></div>
+        <div class="vital-range">Normal range: 36.1–37.5°C</div>
+        <svg class="sparkline" id="spark-temp" viewBox="0 0 300 44" preserveAspectRatio="none"></svg>
+      </div>
+
+    </div>
+  </section>
+
+  <section>
+    <h2>Alert status</h2>
+    <p class="section-note">When the AI layer detects a reading outside safe range, it flags it here immediately — matching the "Send Alert to User" step in the system's data flow.</p>
+    <div class="alert-banner" id="alert-banner">
+      <span style="font-size:20px; line-height:1;">✓</span>
+      <div>
+        <strong id="alert-title">Everything looks normal</strong>
+        <p id="alert-body">No abnormal readings detected in the current session.</p>
+      </div>
+    </div>
+    <div class="controls">
+      <button class="primary" id="btn-simulate">Simulate an abnormal reading</button>
+      <button id="btn-reset">Reset session</button>
+    </div>
+  </section>
+
+  <section>
+    <h2>Medicine reminders</h2>
+    <p class="section-note">A preview of the reminder feature planned for the companion app — add a medicine and a time, and this page will alert you (with sound) when it's due.</p>
+    <div class="med-panel">
+      <form class="med-form" id="med-form">
+        <div class="med-field">
+          <label for="med-name">Medicine name</label>
+          <input type="text" id="med-name" placeholder="e.g. Paracetamol" required>
+        </div>
+        <div class="med-field">
+          <label for="med-time">Time</label>
+          <input type="time" id="med-time" required>
+        </div>
+        <button class="primary" type="submit">Add reminder</button>
+      </form>
+      <ul class="med-list" id="med-list">
+        <li class="med-empty" id="med-empty">No reminders added yet — add one above.</li>
+      </ul>
+    </div>
+  </section>
+
+  <section>
+    <h2>History</h2>
+    <p class="section-note">Trend over the current session — this is what makes early, gradual changes visible before they become emergencies.</p>
+    <div class="chart-panel">
+      <div class="chart-header">
+        <div class="metric-toggle" id="metric-toggle">
+          <button class="active" data-metric="hr">Heart rate</button>
+          <button data-metric="spo2">SpO₂</button>
+          <button data-metric="temp">Temperature</button>
+        </div>
+      </div>
+      <svg id="history-chart" viewBox="0 0 900 220" preserveAspectRatio="none"></svg>
+    </div>
+  </section>
+
+  <section>
+    <h2>How it works</h2>
+    <p class="section-note">The processing pipeline behind this demo, based on the proposed system architecture.</p>
+    <div class="pipeline">
+      <div class="pipe-step">
+        <div class="pipe-icon">❤️</div>
+        <div class="pipe-title">Sensors</div>
+        <div class="pipe-desc">Heart rate, SpO₂, and temperature readings (simulated here; wearable sensors in a full deployment)</div>
+      </div>
+      <div class="pipe-arrow">→</div>
+      <div class="pipe-step">
+        <div class="pipe-icon">📱</div>
+        <div class="pipe-title">Patient device</div>
+        <div class="pipe-desc">Collects and filters readings, checking for noise or missing values</div>
+      </div>
+      <div class="pipe-arrow">→</div>
+      <div class="pipe-step">
+        <div class="pipe-icon">🧠</div>
+        <div class="pipe-title">AI processing</div>
+        <div class="pipe-desc">Compares readings against safe ranges and learned patterns to flag anomalies</div>
+      </div>
+      <div class="pipe-arrow">→</div>
+      <div class="pipe-step">
+        <div class="pipe-icon">⚠️</div>
+        <div class="pipe-title">Alert / display</div>
+        <div class="pipe-desc">Normal data updates the dashboard; abnormal data triggers an immediate alert</div>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<footer>
+  <div class="wrap">
+    <span>VitalWatch — demo built from the seminar "AI-Powered Health Monitoring System Using IoT"</span>
+    <span>Simulated data · no real patient information</span>
+  </div>
+</footer>
+
+<script>
+(function(){
+  const RANGES = {
+    hr:   {min:50, max:110, base:[62,88], unit:'bpm', abnormalLow:40, abnormalHigh:135},
+    spo2: {min:94, max:100, base:[95,99], unit:'%', abnormalLow:85, abnormalHigh:100},
+    temp: {min:36.1, max:37.5, base:[36.4,37.1], unit:'°C', abnormalLow:34.5, abnormalHigh:39.5}
+  };
+  const HISTORY_LEN = 40;
+  const state = {
+    hr: [], spo2: [], temp: [],
+    forcedAbnormal: null,
+    activeMetric: 'hr'
+  };
+
+  function rand(min,max){ return Math.random()*(max-min)+min; }
+
+  function nextReading(metric){
+    const r = RANGES[metric];
+    if(state.forcedAbnormal === metric){
+      state.forcedAbnormal = null;
+      return Math.random() < 0.5 ? r.abnormalLow + rand(-2,2) : r.abnormalHigh + rand(-2,2);
+    }
+    let v = rand(r.base[0], r.base[1]);
+    // small chance of a mild natural drift, still within normal band
+    return v;
+  }
+
+  function isAbnormal(metric, value){
+    const r = RANGES[metric];
+    return value < r.min || value > r.max;
+  }
+
+  function fmt(metric, value){
+    return metric === 'temp' ? value.toFixed(1) : Math.round(value);
+  }
+
+  function pushHistory(metric, value){
+    const arr = state[metric];
+    arr.push(value);
+    if(arr.length > HISTORY_LEN) arr.shift();
+  }
+
+  function drawSparkline(svgId, arr, abnormalFn){
+    const svg = document.getElementById(svgId);
+    if(arr.length < 2){ svg.innerHTML=''; return; }
+    const w=300, h=44, pad=4;
+    const min = Math.min(...arr), max = Math.max(...arr);
+    const range = (max-min) || 1;
+    const pts = arr.map((v,i)=>{
+      const x = pad + (i/(arr.length-1))*(w-pad*2);
+      const y = h-pad - ((v-min)/range)*(h-pad*2);
+      return x+','+y;
+    }).join(' ');
+    const last = arr[arr.length-1];
+    const strokeColor = abnormalFn(last) ? 'var(--alert-line)' : 'var(--primary)';
+    svg.innerHTML = '<polyline points="'+pts+'" fill="none" stroke="'+strokeColor+'" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>';
+  }
+
+  function drawHistoryChart(){
+    const svg = document.getElementById('history-chart');
+    const metric = state.activeMetric;
+    const arr = state[metric];
+    const r = RANGES[metric];
+    const w=900, h=220, padL=40, padR=10, padT=14, padB=26;
+    if(arr.length < 2){ svg.innerHTML=''; return; }
+    const min = Math.min(...arr, r.min);
+    const max = Math.max(...arr, r.max);
+    const range = (max-min) || 1;
+    const x = i => padL + (i/(arr.length-1))*(w-padL-padR);
+    const y = v => h-padB - ((v-min)/range)*(h-padT-padB);
+
+    // normal band
+    const bandTop = y(r.max), bandBottom = y(r.min);
+    let svgContent = '<rect x="'+padL+'" y="'+bandTop+'" width="'+(w-padL-padR)+'" height="'+(bandBottom-bandTop)+'" fill="var(--normal-bg)" opacity="0.5"/>';
+
+    // gridline labels
+    svgContent += '<text x="6" y="'+(y(max))+'" font-size="11" fill="var(--muted)" font-family="var(--font-mono)">'+ (metric==='temp'? max.toFixed(1): Math.round(max)) +'</text>';
+    svgContent += '<text x="6" y="'+(y(min))+'" font-size="11" fill="var(--muted)" font-family="var(--font-mono)">'+ (metric==='temp'? min.toFixed(1): Math.round(min)) +'</text>';
+
+    const pts = arr.map((v,i)=> x(i)+','+y(v)).join(' ');
+    svgContent += '<polyline points="'+pts+'" fill="none" stroke="var(--primary)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>';
+
+    // point markers, red if abnormal
+    arr.forEach((v,i)=>{
+      const abn = isAbnormal(metric, v);
+      svgContent += '<circle cx="'+x(i)+'" cy="'+y(v)+'" r="'+(abn?4:2.5)+'" fill="'+(abn?'var(--alert-line)':'var(--primary)')+'"/>';
+    });
+
+    svg.innerHTML = svgContent;
+  }
+
+  function updateAlertUI(anyAbnormal, details){
+    const pill = document.getElementById('status-pill');
+    const dot = document.getElementById('status-dot');
+    const text = document.getElementById('status-text');
+    const banner = document.getElementById('alert-banner');
+    const title = document.getElementById('alert-title');
+    const body = document.getElementById('alert-body');
+
+    if(anyAbnormal){
+      pill.classList.add('alert');
+      dot.classList.remove('pulse');
+      text.textContent = 'Abnormal reading detected';
+      banner.classList.add('is-alert');
+      title.textContent = 'Alert: abnormal reading detected';
+      body.textContent = details + ' — outside the safe range. In the full system, this would notify the patient and linked family member immediately.';
+    } else {
+      pill.classList.remove('alert');
+      dot.classList.add('pulse');
+      text.textContent = 'All readings normal';
+      banner.classList.remove('is-alert');
+      title.textContent = 'Everything looks normal';
+      body.textContent = 'No abnormal readings detected in the current session.';
+    }
+  }
+
+  function tick(){
+    let anyAbnormal = false;
+    let abnormalDetails = [];
+
+    ['hr','spo2','temp'].forEach(metric=>{
+      const value = nextReading(metric);
+      pushHistory(metric, value);
+      const abn = isAbnormal(metric, value);
+      if(abn){ anyAbnormal = true; abnormalDetails.push(metric.toUpperCase()+': '+fmt(metric,value)+RANGES[metric].unit); }
+
+      document.getElementById('val-'+metric).textContent = fmt(metric, value);
+      document.getElementById('card-'+metric).classList.toggle('abnormal', abn);
+      document.getElementById('flag-'+metric).style.display = abn ? 'inline-block' : 'none';
+      drawSparkline('spark-'+metric, state[metric], v=>isAbnormal(metric,v));
+    });
+
+    updateAlertUI(anyAbnormal, abnormalDetails.join(', '));
+    drawHistoryChart();
+  }
+
+  document.getElementById('btn-simulate').addEventListener('click', ()=>{
+    const metrics = ['hr','spo2','temp'];
+    state.forcedAbnormal = metrics[Math.floor(Math.random()*metrics.length)];
+    tick();
+  });
+
+  document.getElementById('btn-reset').addEventListener('click', ()=>{
+    state.hr = []; state.spo2 = []; state.temp = [];
+    tick();
+  });
+
+  document.getElementById('metric-toggle').addEventListener('click', (e)=>{
+    const btn = e.target.closest('button');
+    if(!btn) return;
+    document.querySelectorAll('#metric-toggle button').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    state.activeMetric = btn.dataset.metric;
+    drawHistoryChart();
+  });
+
+  // seed some initial history so charts aren't empty on load
+  for(let i=0;i<10;i++){ tick(); }
+  setInterval(tick, 2000);
+
+  // ---- Medicine reminders ----
+  const meds = []; // { id, name, time: 'HH:MM', taken: bool, lastAlertedMinute: 'HH:MM'|null }
+  let medIdCounter = 1;
+
+  function playChime(){
+    try{
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      const now = ctx.currentTime;
+      [0, 0.18, 0.36].forEach((offset, i)=>{
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.value = i === 2 ? 880 : 660;
+        gain.gain.setValueAtTime(0.0001, now+offset);
+        gain.gain.exponentialRampToValueAtTime(0.2, now+offset+0.02);
+        gain.gain.exponentialRampToValueAtTime(0.0001, now+offset+0.3);
+        osc.connect(gain).connect(ctx.destination);
+        osc.start(now+offset);
+        osc.stop(now+offset+0.32);
+      });
+    }catch(e){ /* audio unavailable, fail silently */ }
+  }
+
+  function requestNotifyPermission(){
+    try{
+      if('Notification' in window && Notification.permission === 'default'){
+        Notification.requestPermission();
+      }
+    }catch(e){ /* not available, ignore */ }
+  }
+
+  function notifyDue(med){
+    playChime();
+    try{
+      if('Notification' in window && Notification.permission === 'granted'){
+        new Notification('Time for medicine', { body: med.name + ' — scheduled for ' + med.time });
+      }
+    }catch(e){ /* ignore */ }
+  }
+
+  function currentHHMM(){
+    const d = new Date();
+    return String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0');
+  }
+
+  function renderMeds(){
+    const list = document.getElementById('med-list');
+    const empty = document.getElementById('med-empty');
+    if(meds.length === 0){
+      list.innerHTML = '';
+      list.appendChild(empty);
+      return;
+    }
+    const nowHHMM = currentHHMM();
+    const sorted = [...meds].sort((a,b)=> a.time.localeCompare(b.time));
+    list.innerHTML = sorted.map(med=>{
+      const isDue = !med.taken && med.time === nowHHMM;
+      const statusText = med.taken ? 'Taken' : (isDue ? 'Due now' : 'Upcoming');
+      return '<li class="med-item '+(isDue?'due':'')+' '+(med.taken?'taken':'')+'" data-id="'+med.id+'">'
+        + '<div class="med-info">'
+          + '<span class="med-time">'+med.time+'</span>'
+          + '<span><span class="med-name">'+med.name+'</span><br><span class="med-status">'+statusText+'</span></span>'
+        + '</div>'
+        + '<div class="med-actions">'
+          + (!med.taken ? '<button class="taken-btn" data-action="taken" data-id="'+med.id+'">Mark taken</button>' : '')
+          + '<button class="remove-btn" data-action="remove" data-id="'+med.id+'">Remove</button>'
+        + '</div>'
+      + '</li>';
+    }).join('');
+  }
+
+  document.getElementById('med-form').addEventListener('submit', function(e){
+    e.preventDefault();
+    requestNotifyPermission();
+    const nameInput = document.getElementById('med-name');
+    const timeInput = document.getElementById('med-time');
+    if(!nameInput.value.trim() || !timeInput.value) return;
+    meds.push({ id: medIdCounter++, name: nameInput.value.trim(), time: timeInput.value, taken:false, lastAlertedMinute:null });
+    nameInput.value = '';
+    timeInput.value = '';
+    renderMeds();
+  });
+
+  document.getElementById('med-list').addEventListener('click', function(e){
+    const btn = e.target.closest('button');
+    if(!btn) return;
+    const id = Number(btn.dataset.id);
+    const med = meds.find(m=>m.id===id);
+    if(!med) return;
+    if(btn.dataset.action === 'taken'){ med.taken = true; }
+    if(btn.dataset.action === 'remove'){ meds.splice(meds.indexOf(med),1); }
+    renderMeds();
+  });
+
+  function checkMedsDue(){
+    const nowHHMM = currentHHMM();
+    meds.forEach(med=>{
+      if(!med.taken && med.time === nowHHMM && med.lastAlertedMinute !== nowHHMM){
+        med.lastAlertedMinute = nowHHMM;
+        notifyDue(med);
+      }
+    });
+    renderMeds();
+  }
+
+  renderMeds();
+  setInterval(checkMedsDue, 15000);
+})();
+</script>
+
+</body>
+</html>
